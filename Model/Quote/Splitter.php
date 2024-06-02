@@ -26,6 +26,11 @@ class Splitter
     ) {
     }
 
+    /**
+     * @param Quote|CartInterface $quote
+     * @param PaymentInterface|null $paymentMethod
+     * @return Quote[]
+     */
     public function execute(Quote|CartInterface $quote, PaymentInterface $paymentMethod = null): array
     {
         $items = $quote->getAllItems();
