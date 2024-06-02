@@ -53,11 +53,13 @@ class Splitter
                 $this->quoteRepository->save($quoteSplit);
                 foreach ($splitQuoteItem as $item) {
                     $item->setId(null);
+                    $item->setFreeShipping(true);
                     $quoteSplit->addItem($item);
                 }
 
                 $quoteSplit->getBillingAddress()->setData($billingAddress);
                 $quoteSplit->getShippingAddress()->setData($shippingAddress);
+                $quoteSplit->setData('is_split_order', true);
 
                 $quoteSplit->setTotalsCollectedFlag(false)->collectTotals();
 
