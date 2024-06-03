@@ -9,6 +9,8 @@ use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\Data\CartInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Checkout\Model\Session as CheckoutSession;
+use Magento\Sales\Api\Data\OrderInterface;
+use Magento\Sales\Model\Order;
 use Psr\Log\LoggerInterface as Logger;
 
 class Deactivator
@@ -22,7 +24,7 @@ class Deactivator
     ) {
     }
 
-    public function execute(Quote|CartInterface $quote, $order): void
+    public function execute(Quote|CartInterface $quote, array $orderIds, array $realOrderIds): void
     {
         try {
             $quote->setIsActive(false);
@@ -35,9 +37,9 @@ class Deactivator
             $this->quoteRepository->save($quote);
             $this->checkoutSession->setLastQuoteId($quote->getId());
             $this->checkoutSession->setLastSuccessQuoteId($quote->getId());
-            $this->checkoutSession->setLastOrderId($order->getId());
-            $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
-            $this->checkoutSession->setLastOrderStatus($order->getStatus());
+            $this->checkoutSession->setLastSplitOrderIds($orderIds);
+            $this->checkoutSession->setLastSplitRealOrderIds($realOrderIds);
+            $this->checkoutSession->setLastOrderId(reset($orderIds));
         } catch (\Exception $exception) {
             $this->logger->critical(
                 self::EXCEPTION_MESSAGE . $exception->getMessage(),

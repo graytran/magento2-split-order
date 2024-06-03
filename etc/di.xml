@@ -6,8 +6,4 @@
         <plugin name="split_order_quote_management_plugin_split_order_by_items"
                 type="Local\SplitOrder\Plugin\Magento\Quote\Model\QuoteManagement"/>
     </type>
-    <type name="\Magento\Quote\Model\Quote\Address\Total\Shipping">
-        <plugin name="split_order_shipping_set_free_shipping_for_split_orders"
-                type="Local\SplitOrder\Plugin\Magento\Quote\Model\Quote\Address\Total\Shipping"/>
-    </type>
 </config>

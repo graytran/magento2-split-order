@@ -14,6 +14,7 @@ use Magento\Quote\Model\QuoteFactory;
 class Handler
 {
     public final const SPLIT_ORDER_MARK_KEY = 'is_split_order';
+    public final const CACHED_ITEMS_ALL = 'cached_items_all';
 
     public function __construct(
         protected CartRepositoryInterface $quoteRepository,
@@ -26,7 +27,7 @@ class Handler
         $quoteSplit = $this->quoteFactory->create();
         $this->handleGeneralData($quoteSplit, $originalQuote);
         $this->handleItem($quoteSplit, $splitQuoteItems);
-        $this->handleAddress($quoteSplit, $originalQuote);
+        $this->handleAddress($quoteSplit, $originalQuote, $splitQuoteItems);
         $this->handleQuotePayment($quoteSplit, $paymentMethod);
         $this->quoteRepository->save($quoteSplit);
 
@@ -66,7 +67,7 @@ class Handler
         }
     }
 
-    protected function handleAddress(Quote $quoteSplit, Quote $originalQuote): void
+    protected function handleAddress(Quote $quoteSplit, Quote $originalQuote, array $splitQuoteItems): void
     {
         $billingAddress = $originalQuote->getBillingAddress()->getData();
         $shippingAddress = $originalQuote->getShippingAddress()->getData();
@@ -74,10 +75,8 @@ class Handler
         unset($billingAddress['quote_id']);
         unset($shippingAddress['id']);
         unset($shippingAddress['quote_id']);
+        $shippingAddress[self::CACHED_ITEMS_ALL] = $splitQuoteItems;
         $quoteSplit->getBillingAddress()->setData($billingAddress);
         $quoteSplit->getShippingAddress()->setData($shippingAddress);
-        //todo re assgin item for shipping address
-
-
     }
 }

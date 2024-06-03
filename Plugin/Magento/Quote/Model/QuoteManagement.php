@@ -39,10 +39,14 @@ class QuoteManagement
             return $proceed();
         }
 
+        $splitOrderIds = [];
+        $splitRealOrderIds = [];
         foreach ($quoteSplitters as $quoteSplitter) {
             $order = $subject->submit($quoteSplitter);
+            $splitOrderIds[] = $order->getId();
+            $splitRealOrderIds[] = $order->getIncrementId();
         }
-        $this->quoteDeactivator->execute($quote, $order);
+        $this->quoteDeactivator->execute($quote, $splitOrderIds, $splitRealOrderIds);
 
         return $order->getId();
     }
