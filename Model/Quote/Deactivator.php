@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Local\SplitOrder\Model\Quote;
 
 use Magento\Framework\Event\ManagerInterface as EventManager;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\Data\CartInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Sales\Api\Data\OrderInterface;
-use Magento\Sales\Model\Order;
 use Psr\Log\LoggerInterface as Logger;
 
 class Deactivator
@@ -46,6 +45,10 @@ class Deactivator
                 [
                     'trace' => $exception->getTraceAsString()
                 ]
+            );
+
+            throw new LocalizedException(
+                __('something went wrong when deactivate the quote!')
             );
         }
     }

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Local\SplitOrder\Test\Unit\Model\Quote;
 
+use Exception;
 use Local\SplitOrder\Model\Quote\Item\Splitter as ItemSplitter;
 use Local\SplitOrder\Model\Quote\Splitter\Handler;
 use Magento\Checkout\Model\Type\Onepage;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Api\Data\GroupInterface;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Quote\Api\Data\PaymentInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Address;
@@ -28,141 +30,89 @@ class TestSplitter extends TestCase
 {
     protected SubjectUnderTest $subjectUnderTest;
     protected ItemSplitter|MockInterface $quoteItemSpliter;
-    protected QuoteFactory|MockInterface $quoteFactory;
+    protected Handler|MockInterface $quoteSplitHandler;
     protected CartRepositoryInterface|MockInterface $quoteRepository;
     protected Logger|MockInterface $logger;
 
     public function setUp(): void
     {
         $this->quoteItemSpliter = $this->getItemSplitterMock();
-        $this->quoteFactory = $this->getQuoteFactoryMock();
+        $this->quoteSplitHandler = $this->getQuoteSplitHandlerMock();
         $this->quoteRepository = $this->getCartRepositoryMock();
         $this->logger = $this->getLoggerMock();
         $this->subjectUnderTest = new SubjectUnderTest(
             $this->quoteItemSpliter,
-            $this->quoteFactory,
+            $this->quoteSplitHandler,
             $this->quoteRepository,
             $this->logger,
         );
     }
 
-    protected function mockData()
+    public function testExecuteException()
     {
-        yield "case guest checkout" => [
-            'is_guest' => true,
-            'checkout_method' => Onepage::METHOD_GUEST,
-        ];
-        yield "case not guest checkout" => [
-            'is_guest' => false,
-            'checkout_method' => Onepage::METHOD_CUSTOMER,
-        ];
-    }
-
-    /**
-     * @dataProvider mockData
-     */
-    public function testExecute(bool $isGuest, string $checkoutMethod)
-    {
-        $quoteItem1 = $this->getQuoteItemMock();
+        $quote = $this->getQuoteMock();
+        $quoteItem = $this->getQuoteItemMock();
         $quoteItem2 = $this->getQuoteItemMock();
         $quoteItem3 = $this->getQuoteItemMock();
-        $addressData = [
-            'id' => 1,
-            'quote_id' => 1,
-            'address_data' => 'test'
-        ];
-        $items = [
-            $quoteItem1,
-            $quoteItem2,
-            $quoteItem3,
-        ];
-        $splitItems = [
-            [
-                $quoteItem1,
-                $quoteItem2,
-            ],
-            [
-                $quoteItem3
-            ],
-        ];
-
-        $quote = $this->getQuoteMock();
-        $shippingAddress = $this->getAddressMock();
-        $billingAddress = $this->getAddressMock();
-        $quotePayment = $this->getPaymentMock();
-        $paymentMethod = $this->getPaymentMethodMock();
-        $quoteSplit1 = $this->mockQuoteSplit($quote, $paymentMethod, $isGuest, $checkoutMethod, $billingAddress);
-        $quoteSplit2 = $this->mockQuoteSplit($quote, $paymentMethod, $isGuest, $checkoutMethod, $billingAddress);
-
+        $items = [$quoteItem, $quoteItem2, $quoteItem3];
+        $paymentMethod =$this->getPaymentMethodMock();
         $quote->shouldReceive('getAllItems')->andReturn($items);
-        $quote->shouldReceive('getShippingAddress')->andReturn($shippingAddress);
-        $quote->shouldReceive('getBillingAddress')->andReturn($billingAddress);
-        $shippingAddress->shouldReceive('getData')->andReturn($addressData);
-        $billingAddress->shouldReceive('getData')->andReturn($addressData);
+        $splitQuoteItemsArray = [
+            [$quoteItem, $quoteItem2],
+            [$quoteItem3]
+        ];
+        $splitQuote1 = $this->getQuoteMock();
 
-        $this->quoteItemSpliter->shouldReceive('execute')->with($items)->andReturn($splitItems);
-        $quote->shouldReceive('getPayment')->andReturn($quotePayment)->once();
-        $quotePayment->shouldReceive('getMethod')->andReturn('flatrate_flatrate')->once();
+        $this->quoteItemSpliter->shouldReceive('execute')->andReturn($splitQuoteItemsArray);
+        $this->quoteSplitHandler->shouldReceive('execute')->with($quote, [$quoteItem, $quoteItem2], $paymentMethod)->andReturn($splitQuote1);
+        $exception = new Exception('test');
+        $this->quoteSplitHandler->shouldReceive('execute')->with($quote, [$quoteItem3], $paymentMethod)->andThrow($exception);
+        $this->logger->shouldReceive('critical')->with(
+            SubjectUnderTest::EXCEPTION_MESSAGE . 'test',
+            [
+                'trace' => $exception->getTraceAsString()
+            ]
+        );
+        $this->expectException(LocalizedException::class);
+        $this->subjectUnderTest->execute($quote, $paymentMethod);
+    }
 
-        $quoteItem1->shouldReceive('setid')->with(null)->andReturnSelf();
-        $quoteItem2->shouldReceive('setid')->with(null)->andReturnSelf();
-        $quoteItem3->shouldReceive('setid')->with(null)->andReturnSelf();
-        $quoteSplit1->shouldReceive('addItem')->andReturnSelf();
-        $quoteSplit1->shouldReceive('addItem')->andReturnSelf();
-        $quoteSplit2->shouldReceive('addItem')->andReturnSelf();
+    public function testExecute()
+    {
+        $quote = $this->getQuoteMock();
+        $quoteItem = $this->getQuoteItemMock();
+        $quoteItem2 = $this->getQuoteItemMock();
+        $quoteItem3 = $this->getQuoteItemMock();
+        $items = [$quoteItem, $quoteItem2, $quoteItem3];
+        $paymentMethod =$this->getPaymentMethodMock();
+        $quote->shouldReceive('getAllItems')->andReturn($items);
+        $splitQuoteItemsArray = [
+            [$quoteItem, $quoteItem2],
+            [$quoteItem3]
+        ];
+        $splitQuote1 = $this->getQuoteMock();
+        $splitQuote2 = $this->getQuoteMock();
 
-        $result = $this->subjectUnderTest->execute($quote);
+        $this->quoteItemSpliter->shouldReceive('execute')->andReturn($splitQuoteItemsArray);
+        $this->quoteSplitHandler->shouldReceive('execute')->with($quote, [$quoteItem, $quoteItem2], $paymentMethod)->andReturn($splitQuote1);
+        $this->quoteSplitHandler->shouldReceive('execute')->with($quote, [$quoteItem3], $paymentMethod)->andReturn($splitQuote2);
+
+        $result = $this->subjectUnderTest->execute($quote, $paymentMethod);
 
         $this->assertEquals(2, count($result));
+        $this->assertEquals([$splitQuote1, $splitQuote2], ($result));
         $this->assertInstanceOf(Quote::class, reset($result));
     }
 
-    protected function mockQuoteSplit($quote, $paymentMethod, $isGuest, $checkoutMethod, $billingAddress)
-    {
-        $quoteSplit = $this->getQuoteMock();
-        $customer = $this->getCustomerMock();
-        $quoteSplitShippingAddress = $this->getAddressMock();
-        $quoteSplitBillingAddress = $this->getAddressMock();
-        $quoteSplitPayment = $this->getPaymentMock();
-        $this->quoteFactory->shouldReceive('create')->andReturn($quoteSplit);
-        $quote->shouldReceive('getStoreId')->andReturn(1);
-        $quote->shouldReceive('getCustomer')->andReturn($customer);
-        $quote->shouldReceive('getCustomerIsGuest')->andReturn($isGuest);
-        $quoteSplit->shouldReceive('setStoreId')->with(1)->andReturnSelf()->once();
-        $quoteSplit->shouldReceive('setCustomer')->with($customer)->andReturnSelf()->once();
-        $quoteSplit->shouldReceive('setCustomerIsGuest')->with($isGuest)->andReturnSelf()->once();
-
-        $quote->shouldReceive('getCheckoutMethod')->andReturn($checkoutMethod);
-        if ($checkoutMethod === Onepage::METHOD_GUEST) {
-            $billingAddress->shouldReceive('getEmail')->andReturn('test@gmail.com');
-            $quoteSplit->shouldReceive('setCustomerEmail')->with('test@gmail.com')->andReturnSelf();
-            $quoteSplit->shouldReceive('setCustomerGroupId')->with(GroupInterface::NOT_LOGGED_IN_ID)->andReturnSelf();
-        }
-
-        $this->quoteRepository->shouldReceive('save')->with($quoteSplit)->andReturnNull()->twice();
-        $quoteSplit->shouldReceive('getBillingAddress')->andReturn($quoteSplitBillingAddress);
-        $quoteSplit->shouldReceive('getShippingAddress')->andReturn($quoteSplitShippingAddress);
-        $quoteSplitBillingAddress->shouldReceive('setData')->with(['address_data' => 'test'])->andReturnSelf();
-        $quoteSplitShippingAddress->shouldReceive('setData')->with(['address_data' => 'test'])->andReturnSelf();
-        $quoteSplit->shouldReceive('setData')->with(Handler::SPLIT_ORDER_MARK_KEY, true)->andReturnSelf();
-        $quoteSplit->shouldReceive('setTotalsCollectedFlag')->with(false)->andReturnSelf();
-        $quoteSplit->shouldReceive('collectTotals')->andReturnSelf();
-        $quoteSplit->shouldReceive('getPayment')->andReturn($quoteSplitPayment);
-        $quoteSplitPayment->shouldReceive('setMethod')->with('flatrate_flatrate')->andReturnSelf();
-        $quoteSplitPayment->shouldReceive('setQuote')->with($quoteSplit)->andReturnSelf();
-        $paymentMethod->shouldReceive('getData')->andReturn(['payment_data']);
-        $quoteSplitPayment->shouldReceive('importData')->with(['payment_data'])->andReturnSelf();
-
-        return $quoteSplit;
-    }
 
     public function testExecuteCaseNotSplit()
     {
         $quote = $this->getQuoteMock();
         $quoteItem = $this->getQuoteItemMock();
         $items = [$quoteItem];
+        $paymentMethod =$this->getPaymentMethodMock();
         $quote->shouldReceive('getAllItems')->andReturn($items);
-        $result = $this->subjectUnderTest->execute($quote);
+        $result = $this->subjectUnderTest->execute($quote, $paymentMethod);
         $this->assertEquals([], $result);
     }
 
@@ -176,9 +126,9 @@ class TestSplitter extends TestCase
         return Mockery::mock(ItemSplitter::class);
     }
 
-    protected function getQuoteFactoryMock(): QuoteFactory|MockInterface
+    protected function getQuoteSplitHandlerMock(): Handler|MockInterface
     {
-        return Mockery::mock(QuoteFactory::class);
+        return Mockery::mock(Handler::class);
     }
 
     protected function getQuoteMock(): Quote|MockInterface

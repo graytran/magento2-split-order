@@ -6,6 +6,7 @@ namespace Local\SplitOrder\Model\Quote;
 
 use Local\SplitOrder\Model\Quote\Item\Splitter as ItemSplitter;
 use Local\SplitOrder\Model\Quote\Splitter\Handler;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\Data\CartInterface;
 use Magento\Quote\Api\Data\PaymentInterface;
@@ -27,6 +28,7 @@ class Splitter
 
     /**
      * @return Quote[]
+     * @throws LocalizedException
      */
     public function execute(Quote|CartInterface $quote, PaymentInterface $paymentMethod): array
     {
@@ -48,6 +50,10 @@ class Splitter
                 [
                     'trace' => $exception->getTraceAsString()
                 ]
+            );
+
+            throw new LocalizedException(
+                __('something went wrong with the split order!')
             );
         }
 
