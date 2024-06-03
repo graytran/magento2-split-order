@@ -26,6 +26,7 @@ class Handler
         $quoteSplit = $this->quoteFactory->create();
         $this->handleQuoteData($quoteSplit, $originalQuote);
         $this->handleItem($quoteSplit, $splitQuoteItems);
+        $this->handleAddress($quoteSplit, $originalQuote);
         $quoteSplit->setTotalsCollectedFlag(false)->collectTotals();
         $this->handleQuotePayment($quoteSplit, $originalQuote, $paymentMethod);
         $this->quoteRepository->save($quoteSplit);
@@ -46,12 +47,9 @@ class Handler
 
     protected function handleQuoteData(Quote $quoteSplit, Quote $originalQuote): void
     {
-        list($billingAddress, $shippingAddress) = $this->cloneAddress($originalQuote);
         $quoteSplit->setStoreId($originalQuote->getStoreId());
         $quoteSplit->setCustomer($originalQuote->getCustomer());
         $quoteSplit->setCustomerIsGuest($originalQuote->getCustomerIsGuest());
-        $quoteSplit->getBillingAddress()->setData($billingAddress);
-        $quoteSplit->getShippingAddress()->setData($shippingAddress);
         $quoteSplit->setData(self::SPLIT_ORDER_MARK_KEY, true);
         if ($originalQuote->getCheckoutMethod() === Onepage::METHOD_GUEST) {
             $quoteSplit->setCustomerEmail($originalQuote->getBillingAddress()->getEmail());
@@ -69,14 +67,16 @@ class Handler
         }
     }
 
-    protected function cloneAddress(Quote $quote): array
+    protected function handleAddress(Quote $quoteSplit, Quote $originalQuote): array
     {
-        $billingAddress = $quote->getBillingAddress()->getData();
-        $shippingAddress = $quote->getShippingAddress()->getData();
+        $billingAddress = $originalQuote->getBillingAddress()->getData();
+        $shippingAddress = $originalQuote->getShippingAddress()->getData();
         unset($billingAddress['id']);
         unset($billingAddress['quote_id']);
         unset($shippingAddress['id']);
         unset($shippingAddress['quote_id']);
+        $quoteSplit->getBillingAddress()->setData($billingAddress);
+        $quoteSplit->getShippingAddress()->setData($shippingAddress);
 
         return [$billingAddress, $shippingAddress];
     }
