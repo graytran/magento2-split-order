@@ -23,8 +23,6 @@ class Shipping
             return $result;
         }
 
-        $total->setBaseShippingAmount(0);
-        $total->setShippingAmount(0);
         return $result;
     }
 }

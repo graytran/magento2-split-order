@@ -15,6 +15,7 @@ use Psr\Log\LoggerInterface as Logger;
 class Splitter
 {
     public final const SPLIT_ORDER_ITEM_NUMBER_THRESHOLD = 2;
+    public final const EXCEPTION_MESSAGE = 'there is an error happened when split quote: ';
 
     public function __construct(
         protected ItemSplitter $quoteItemSpliter,
@@ -27,7 +28,7 @@ class Splitter
     /**
      * @return Quote[]
      */
-    public function execute(Quote|CartInterface $quote, PaymentInterface $paymentMethod = null): array
+    public function execute(Quote|CartInterface $quote, PaymentInterface $paymentMethod): array
     {
         $items = $quote->getAllItems();
         if (count($items) < self::SPLIT_ORDER_ITEM_NUMBER_THRESHOLD) {
@@ -43,7 +44,7 @@ class Splitter
             }
         } catch (\Exception $exception) {
             $this->logger->critical(
-                'there is an error happened when split quote: ' . $exception->getMessage(),
+                self::EXCEPTION_MESSAGE . $exception->getMessage(),
                 [
                     'trace' => $exception->getTraceAsString()
                 ]

@@ -21,31 +21,30 @@ class Handler
     ) {
     }
 
-    public function execute(Quote $originalQuote, array $splitQuoteItems, PaymentInterface $paymentMethod = null): Quote
+    public function execute(Quote $originalQuote, array $splitQuoteItems, PaymentInterface $paymentMethod): Quote
     {
         $quoteSplit = $this->quoteFactory->create();
-        $this->handleQuoteData($quoteSplit, $originalQuote);
+        $this->handleGeneralData($quoteSplit, $originalQuote);
         $this->handleItem($quoteSplit, $splitQuoteItems);
         $this->handleAddress($quoteSplit, $originalQuote);
-        $quoteSplit->setTotalsCollectedFlag(false)->collectTotals();
-        $this->handleQuotePayment($quoteSplit, $originalQuote, $paymentMethod);
+        $this->handleQuotePayment($quoteSplit, $paymentMethod);
         $this->quoteRepository->save($quoteSplit);
 
         return $quoteSplit;
     }
 
-    protected function handleQuotePayment(Quote $quoteSplit, Quote $originalQuote, PaymentInterface $paymentMethod = null): void
+    protected function handleQuotePayment(Quote $quoteSplit, PaymentInterface $paymentMethod): void
     {
-        $paymentMethodString = $originalQuote->getPayment()->getMethod();
+        $paymentMethodString = $paymentMethod->getMethod();
         $quoteSplit->getPayment()->setMethod($paymentMethodString);
-        if ($paymentMethod) {
-            $quoteSplit->getPayment()->setQuote($quoteSplit);
-            $data = $paymentMethod->getData();
-            $quoteSplit->getPayment()->importData($data);
-        }
+        $quoteSplit->getPayment()->setQuote($quoteSplit);
+        $data = $paymentMethod->getData();
+        $quoteSplit->getPayment()->importData($data);
+
+        $quoteSplit->setTotalsCollectedFlag(false)->collectTotals();
     }
 
-    protected function handleQuoteData(Quote $quoteSplit, Quote $originalQuote): void
+    protected function handleGeneralData(Quote $quoteSplit, Quote $originalQuote): void
     {
         $quoteSplit->setStoreId($originalQuote->getStoreId());
         $quoteSplit->setCustomer($originalQuote->getCustomer());
@@ -67,7 +66,7 @@ class Handler
         }
     }
 
-    protected function handleAddress(Quote $quoteSplit, Quote $originalQuote): array
+    protected function handleAddress(Quote $quoteSplit, Quote $originalQuote): void
     {
         $billingAddress = $originalQuote->getBillingAddress()->getData();
         $shippingAddress = $originalQuote->getShippingAddress()->getData();
@@ -77,7 +76,8 @@ class Handler
         unset($shippingAddress['quote_id']);
         $quoteSplit->getBillingAddress()->setData($billingAddress);
         $quoteSplit->getShippingAddress()->setData($shippingAddress);
+        //todo re assgin item for shipping address
 
-        return [$billingAddress, $shippingAddress];
+
     }
 }
