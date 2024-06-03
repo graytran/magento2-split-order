@@ -11,7 +11,7 @@ class Splitter
 
     /**
      * @param Item[] $items
-     * @return Item[]
+     * @return array
      */
     public function execute(array $items): array
     {

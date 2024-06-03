@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Local\SplitOrder\Plugin\Magento\Quote\Model\Quote\Address\Total;
 
+use Local\SplitOrder\Model\Quote\Splitter\Handler;
 use Magento\Quote\Api\Data\ShippingAssignmentInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Address\Total;
@@ -18,7 +19,7 @@ class Shipping
         ShippingAssignmentInterface $shippingAssignment,
         Total $total,
     ) {
-        if (!$quote->getData('is_split_order')) {
+        if (!$quote->getData(Handler::SPLIT_ORDER_MARK_KEY)) {
             return $result;
         }
 

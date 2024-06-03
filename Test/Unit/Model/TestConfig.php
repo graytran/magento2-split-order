@@ -48,7 +48,7 @@ class TestConfig extends TestCase
         $this->assertEquals($isEnable, $this->subjectUnderTest->isSplitOrderEnabled());
     }
 
-    protected function getScopeConfigMock()
+    protected function getScopeConfigMock(): ScopeConfigInterface|MockInterface
     {
         return Mockery::mock(ScopeConfigInterface::class);
     }
