@@ -13,7 +13,6 @@ use Local\SplitOrder\Model\Quote\Item\Splitter as SubjectUnderTest;
 class TestSplitter extends TestCase
 {
     protected SubjectUnderTest $subjectUnderTest;
-    protected ScopeConfigInterface|MockInterface $config;
 
     public function setUp(): void
     {

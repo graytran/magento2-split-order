@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Local\SplitOrder\Test\Unit\Plugin\Magento\Quote\Model;
 
 use Local\SplitOrder\Model\Config;
+use Local\SplitOrder\Model\Quote\Deactivator;
 use Local\SplitOrder\Model\Quote\Splitter;
 use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\Data\CartInterface;
@@ -23,77 +24,87 @@ class TestQuoteManagement extends TestCase
     protected CartRepositoryInterface|MockInterface $quoteRepository;
     protected Splitter|MockInterface $quoteSplitter;
     protected Config|MockInterface $config;
+    protected Deactivator|MockInterface $quoteDeactivator;
 
     public function setUp(): void
     {
         $this->config = $this->getConfigMock();
         $this->quoteSplitter = $this->getQuoteSplitterMock();
         $this->quoteRepository = $this->getQuoteRepositoryMock();
+        $this->quoteDeactivator = $this->getQuoteDeactivatorMock();
         $this->subjectUnderTest = new SubjectUnderTest(
             $this->quoteRepository,
             $this->quoteSplitter,
-            $this->config
+            $this->config,
+            $this->quoteDeactivator
         );
     }
 
-    public function testAfterPlaceOrderCaseDisableSplitOrder()
+    public function testAroundPlaceOrderCaseDisableSplitOrder()
     {
         $this->config->shouldReceive('isSplitOrderEnabled')->andReturn(false)->once();
-        $orderId = '1';
+        $orderId = '123';
         $cartId = 1;
         $paymentMethod = $this->getPaymentMethodMock();
         $subject = $this->getSubjectMock();
+        $proceed = function () {
+            return '123';
+        };
 
-        $result = $this->subjectUnderTest->afterPlaceOrder($subject, $orderId, $cartId, $paymentMethod);
+        $result = $this->subjectUnderTest->aroundPlaceOrder($subject, $proceed, $cartId, $paymentMethod);
         $this->assertEquals($orderId, $result);
     }
 
-    protected function mockSplitQuoteData()
-    {
-        $splitOrder1 = $this->getOrderMock();
-        $splitOrder2 = $this->getOrderMock();
-        $splitOrder1->shouldReceive('getId')->andReturn('2');
-        $splitOrder2->shouldReceive('getId')->andReturn('3');
-
-        yield "case item < 2 not split quote" => [
-            'split_quotes' => [],
-            'split_orders' => [],
-            'expected' => '1'
-        ];
-
-        yield "case item > 2 not split quote" => [
-            'split_quotes' => [
-                $this->getQuoteMock(),
-                $this->getQuoteMock()
-            ],
-            'split_orders' => [
-                $splitOrder1,
-                $splitOrder2,
-            ],
-            'expected' => '2,3'
-        ];
-    }
-
-    /**
-     * @dataProvider mockSplitQuoteData
-     */
-    public function testAfterPlaceOrderCaseEnableSplitOrder($splitQuotes, $splitOrders, $expeccted)
+    public function testAroundPlaceOrderCaseEnableSplitOrderMoreThanTwoItem()
     {
         $this->config->shouldReceive('isSplitOrderEnabled')->andReturn(true)->once();
-        $orderId = '1';
         $cartId = 1;
         $quote = $this->getQuoteMock();
         $paymentMethod = $this->getPaymentMethodMock();
         $subject = $this->getSubjectMock();
+        $proceed = function () {
+            return '123';
+        };
 
-        $this->quoteRepository->shouldReceive('get')->with($cartId)->andReturn($quote);
+        $splitQuote1 = $this->getQuoteMock();
+        $splitQuote2 = $this->getQuoteMock();
+        $splitOrder1 = $this->getOrderMock();
+        $splitOrder2 = $this->getOrderMock();
+        $splitQuotes = [$splitQuote1, $splitQuote2];
+
+        $this->quoteRepository->shouldReceive('getActive')->with($cartId)->andReturn($quote);
+        $quote->shouldReceive('getPayment')->andReturn($paymentMethod);
         $this->quoteSplitter->shouldReceive('execute')->with($quote, $paymentMethod)->andReturn($splitQuotes);
-        foreach ($splitQuotes as $key => $splitQuote) {
-            $subject->shouldReceive('submit')->with($splitQuote)->andReturn($splitOrders[$key])->once();
-        }
+        $subject->shouldReceive('submit')->with($splitQuote1)->andReturn($splitOrder1);
+        $subject->shouldReceive('submit')->with($splitQuote2)->andReturn($splitOrder2);
+        $splitOrder1->shouldReceive('getId')->andReturn('1');
+        $splitOrder1->shouldReceive('getIncrementId')->andReturn('001');
+        $splitOrder2->shouldReceive('getId')->andReturn('2');
+        $splitOrder2->shouldReceive('getIncrementId')->andReturn('002');
+        $this->quoteDeactivator->shouldReceive('execute')->with($quote, ['1', '2'], ['001', '002']);
 
-        $result = $this->subjectUnderTest->afterPlaceOrder($subject, $orderId, $cartId, $paymentMethod);
-        $this->assertEquals($expeccted, $result);
+        $result = $this->subjectUnderTest->aroundPlaceOrder($subject, $proceed, $cartId);
+        $this->assertEquals('2', $result);
+    }
+
+
+    public function testAroundPlaceOrderCaseEnableSplitOrderLessThanTwoItem()
+    {
+        $this->config->shouldReceive('isSplitOrderEnabled')->andReturn(true)->once();
+        $cartId = 1;
+        $quote = $this->getQuoteMock();
+        $paymentMethod = $this->getPaymentMethodMock();
+        $subject = $this->getSubjectMock();
+        $proceed = function () {
+            return '1';
+        };
+
+        $this->quoteRepository->shouldReceive('getActive')->with($cartId)->andReturn($quote);
+        $quote->shouldReceive('getPayment')->andReturn($paymentMethod);
+        $this->quoteSplitter->shouldReceive('execute')->with($quote, $paymentMethod)->andReturn([]);
+
+        $result = $this->subjectUnderTest->aroundPlaceOrder($subject, $proceed, $cartId, $paymentMethod);
+        $this->assertEquals('1', $result);
     }
 
     protected function getOrderMock()
@@ -127,10 +138,13 @@ class TestQuoteManagement extends TestCase
         return Mockery::mock(Splitter::class);
     }
 
-
     protected function getQuoteRepositoryMock(): CartRepositoryInterface|MockInterface
     {
         return Mockery::mock(CartRepositoryInterface::class);
+    }
+    protected function getQuoteDeactivatorMock(): Deactivator|MockInterface
+    {
+        return Mockery::mock(Deactivator::class);
     }
 
 }

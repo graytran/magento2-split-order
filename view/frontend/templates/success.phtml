@@ -1,0 +1,45 @@
+<?php
+/**
+ * @var Escaper $escaper
+ * @var $viewModel SplitOrderSuccess
+ * @var $block Success
+ */
+
+use Local\SplitOrder\ViewModel\SplitOrderSuccess;
+use Magento\Checkout\Block\Onepage\Success;
+use Magento\Framework\Escaper;
+
+$viewModel = $block->getData('split_order_success');
+$lastSplitOrderIds = $viewModel->getLastSplitOrderIds();
+
+?>
+
+<div class="checkout-success">
+    <?php if (!empty($lastSplitOrderIds)): ?>
+        <?php if ($block->getCanViewOrder()) :?>
+            <?php foreach($lastSplitOrderIds as $lastSplitOrderId => $lastSplitRealOrderIds): ?>
+                <p><?= $escaper->escapeHtml(__('Your order number is: %1.', sprintf('<a href="%s" class="order-number"><strong>%s</strong></a>', $escaper->escapeUrl($viewModel->getViewOrderUrl($lastSplitOrderId)), $lastSplitRealOrderIds)), ['a', 'strong']) ?></p>
+            <?php endforeach; ?>
+        <?php  else :?>
+            <?php foreach($lastSplitOrderIds as $lastSplitOrderId => $lastSplitRealOrderIds): ?>
+                <p><?= $escaper->escapeHtml(__('Your order # is: <span>%1</span>.', $lastSplitOrderId), ['span']) ?></p>
+            <?php endforeach; ?>
+        <?php endif;?>
+        <p><?= $escaper->escapeHtml(__('We\'ll email you an order confirmation with details and tracking info.')) ?></p>
+    <?php elseif ($block->getOrderId()) :?>
+        <?php if ($block->getCanViewOrder()) :?>
+            <p><?= $escaper->escapeHtml(__('Your order number is: %1.', sprintf('<a href="%s" class="order-number"><strong>%s</strong></a>', $escaper->escapeUrl($block->getViewOrderUrl()), $block->getOrderId())), ['a', 'strong']) ?></p>
+        <?php  else :?>
+            <p><?= $escaper->escapeHtml(__('Your order # is: <span>%1</span>.', $block->getOrderId()), ['span']) ?></p>
+        <?php endif;?>
+        <p><?= $escaper->escapeHtml(__('We\'ll email you an order confirmation with details and tracking info.')) ?></p>
+    <?php endif;?>
+
+    <?= $block->getAdditionalInfoHtml() ?>
+
+    <div class="actions-toolbar">
+        <div class="primary">
+            <a class="action primary continue" href="<?= $escaper->escapeUrl($block->getContinueUrl()) ?>"><span><?= $escaper->escapeHtml(__('Continue Shopping')) ?></span></a>
+        </div>
+    </div>
+</div>

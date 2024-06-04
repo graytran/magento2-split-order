@@ -13,7 +13,7 @@ use Magento\Quote\Model\QuoteFactory;
 
 class Handler
 {
-    public final const SPLIT_ORDER_MARK_KEY = 'is_split_order';
+    public final const CACHED_ITEMS_ALL = 'cached_items_all';
 
     public function __construct(
         protected CartRepositoryInterface $quoteRepository,
@@ -21,53 +21,51 @@ class Handler
     ) {
     }
 
-    public function execute(Quote $originalQuote, array $splitQuoteItems, PaymentInterface $paymentMethod = null): Quote
+    public function execute(Quote $originalQuote, array $splitQuoteItems, PaymentInterface $paymentMethod): Quote
     {
-        $quoteSplit = $this->quoteFactory->create();
-        $this->handleQuoteData($quoteSplit, $originalQuote);
-        $this->handleItem($quoteSplit, $splitQuoteItems);
-        $this->handleAddress($quoteSplit, $originalQuote);
-        $quoteSplit->setTotalsCollectedFlag(false)->collectTotals();
-        $this->handleQuotePayment($quoteSplit, $originalQuote, $paymentMethod);
-        $this->quoteRepository->save($quoteSplit);
+        $splitQuote = $this->quoteFactory->create();
+        $this->handleGeneralData($splitQuote, $originalQuote);
+        $this->handleItem($splitQuote, $splitQuoteItems);
+        $this->handleAddress($splitQuote, $originalQuote, $splitQuoteItems);
+        $this->handleQuotePayment($splitQuote, $paymentMethod);
+        $this->quoteRepository->save($splitQuote);
 
-        return $quoteSplit;
+        return $splitQuote;
     }
 
-    protected function handleQuotePayment(Quote $quoteSplit, Quote $originalQuote, PaymentInterface $paymentMethod = null): void
+    protected function handleQuotePayment(Quote $splitQuote, PaymentInterface $paymentMethod): void
     {
-        $paymentMethodString = $originalQuote->getPayment()->getMethod();
-        $quoteSplit->getPayment()->setMethod($paymentMethodString);
-        if ($paymentMethod) {
-            $quoteSplit->getPayment()->setQuote($quoteSplit);
-            $data = $paymentMethod->getData();
-            $quoteSplit->getPayment()->importData($data);
-        }
+        $paymentMethodString = $paymentMethod->getMethod();
+        $splitQuote->getPayment()->setMethod($paymentMethodString);
+        $splitQuote->getPayment()->setQuote($splitQuote);
+        $data = $paymentMethod->getData();
+        $splitQuote->getPayment()->importData($data);
+
+        $splitQuote->setTotalsCollectedFlag(false)->collectTotals();
     }
 
-    protected function handleQuoteData(Quote $quoteSplit, Quote $originalQuote): void
+    protected function handleGeneralData(Quote $splitQuote, Quote $originalQuote): void
     {
-        $quoteSplit->setStoreId($originalQuote->getStoreId());
-        $quoteSplit->setCustomer($originalQuote->getCustomer());
-        $quoteSplit->setCustomerIsGuest($originalQuote->getCustomerIsGuest());
-        $quoteSplit->setData(self::SPLIT_ORDER_MARK_KEY, true);
+        $splitQuote->setStoreId($originalQuote->getStoreId());
+        $splitQuote->setCustomer($originalQuote->getCustomer());
+        $splitQuote->setCustomerIsGuest($originalQuote->getCustomerIsGuest());
         if ($originalQuote->getCheckoutMethod() === Onepage::METHOD_GUEST) {
-            $quoteSplit->setCustomerEmail($originalQuote->getBillingAddress()->getEmail());
-            $quoteSplit->setCustomerGroupId(GroupInterface::NOT_LOGGED_IN_ID);
+            $splitQuote->setCustomerEmail($originalQuote->getBillingAddress()->getEmail());
+            $splitQuote->setCustomerGroupId(GroupInterface::NOT_LOGGED_IN_ID);
         }
     }
 
-    protected function handleItem(Quote $quoteSplit, array $splitQuoteItems): void
+    protected function handleItem(Quote $splitQuote, array $splitQuoteItems): void
     {
         // save quoteSplit in order to have a quote id for item
-        $this->quoteRepository->save($quoteSplit);
+        $this->quoteRepository->save($splitQuote);
         foreach ($splitQuoteItems as $item) {
             $item->setId(null);
-            $quoteSplit->addItem($item);
+            $splitQuote->addItem($item);
         }
     }
 
-    protected function handleAddress(Quote $quoteSplit, Quote $originalQuote): array
+    protected function handleAddress(Quote $splitQuote, Quote $originalQuote, array $splitQuoteItems): void
     {
         $billingAddress = $originalQuote->getBillingAddress()->getData();
         $shippingAddress = $originalQuote->getShippingAddress()->getData();
@@ -75,9 +73,8 @@ class Handler
         unset($billingAddress['quote_id']);
         unset($shippingAddress['id']);
         unset($shippingAddress['quote_id']);
-        $quoteSplit->getBillingAddress()->setData($billingAddress);
-        $quoteSplit->getShippingAddress()->setData($shippingAddress);
-
-        return [$billingAddress, $shippingAddress];
+        $shippingAddress[self::CACHED_ITEMS_ALL] = $splitQuoteItems;
+        $splitQuote->getBillingAddress()->setData($billingAddress);
+        $splitQuote->getShippingAddress()->setData($shippingAddress);
     }
 }
