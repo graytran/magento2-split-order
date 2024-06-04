@@ -2,7 +2,7 @@
 
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" layout="1column" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
-        <referenceBlock name="checkout.success" template="Local_SplitOrder::success.phtml" cacheable="false">
+        <referenceBlock name="checkout.success" template="Local_SplitOrder::success.phtml">
             <arguments>
                 <argument name="split_order_success" xsi:type="object">Local\SplitOrder\ViewModel\SplitOrderSuccess</argument>
             </arguments>
